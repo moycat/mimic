@@ -172,5 +172,10 @@ static inline bool ipv6_is_ext(__u8 nexthdr) {
     else if ((val) < 3)    \
       (val) = 2;           \
   })
+#define bpf_gt0_lt_hack(val, bound)               \
+  ({                                              \
+    if ((val) < 2) (val) = 1;                     \
+    if ((val) > (bound) - 2) (val) = (bound) - 1; \
+  })
 
 #endif  // MIMIC_BPF_MIMIC_H

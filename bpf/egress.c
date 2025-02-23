@@ -33,6 +33,7 @@ static inline int mangle_data(struct __sk_buff* skb, __u16 offset, __be32* csum_
   if (padding_len > 0) {
     bpf_gt0_hack2(padding_len);
     padding_len = min(padding_len, MAX_PADDING_LEN);
+    bpf_gt0_hack2(padding_len);
 
     for (int i = 0; i < padding_len / 4 + !!(padding_len % 4); i++)
       ((__u32*)buf)[i] = bpf_get_prandom_u32();
