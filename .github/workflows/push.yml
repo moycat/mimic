@@ -6,8 +6,8 @@ on:
 
 jobs:
   test:
-    name: Run tests with ${{ matrix.flags.flags }} ${{ matrix.flags.args }}
-    runs-on: ubuntu-24.04
+    name: Test ${{ matrix.flags.flags }} ${{ matrix.flags.args }} with Clang ${{ matrix.clang-versions }} on ${{ matrix.runs-on }}
+    runs-on: ${{ matrix.runs-on }}
     strategy:
       fail-fast: false
       matrix:
@@ -27,17 +27,19 @@ jobs:
           - flags: CHECKSUM_HACK=kprobe STRIP_BTF_EXT=1
             args: ''
             desc: kprobe-strip-btf-ext
+        clang-versions: ["14", "15", "16", "17", "18"]
+        runs-on: [ubuntu-24.04, ubuntu-24.04-arm]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install dependencies
         run: |
-          sudo apt install python3 clang-15 llvm pahole \
+          sudo apt install python3 clang-${{ matrix.clang-versions }} llvm pahole \
             bats bc conntrack ethtool iperf3 jq socat tshark wireguard-tools \
             libbpf-dev libffi-dev libelf-dev libxdp-dev
       - name: Build & Test
         run: |
-          export BPF_CC=clang-15
+          export BPF_CC=clang-${{ matrix.clang-versions }}
           sudo cp /sys/kernel/btf/vmlinux /lib/modules/`uname -r`/build
           make -j ${{ matrix.flags.flags }}
           sudo nft delete table filter  # Docker's nftables rule drops IPv4 packets in tests
@@ -47,7 +49,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: pcap-${{ matrix.flags.desc }}
+          name: pcap-${{ matrix.flags.desc }}-clang-${{ matrix.clang-versions }}-${{ runner.arch }}
           path: out/*.pcapng
   build-deb:
     name: Build .deb packages for ${{ matrix.distro.name }}
@@ -61,9 +63,6 @@ jobs:
             image: debian:bookworm-slim
             extra-repos: |
               deb http://deb.debian.org/debian bookworm-backports main
-            extra-cmd: |
-              sed -i 's/clang/clang-16/' debian/control
-              sed -i 's/BPF_CC=clang/BPF_CC=clang-16/' debian/rules
           - name: Debian 13 (testing)
             codename: trixie
             image: debian:trixie-slim
@@ -78,8 +77,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Run pre-building script
-        run: ${{ matrix.distro.extra-cmd }}
       - name: Build
         uses: jtdor/build-deb-action@v1
         with:
