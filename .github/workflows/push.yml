@@ -5,191 +5,49 @@ on:
   workflow_dispatch:
 
 jobs:
-  # build:
-  #   name: Build with ${{ matrix.flags.desc }} on ${{ matrix.containers.desc }} with Clang ${{ matrix.clang-versions }} on ${{ matrix.runs-on }}
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       runs-on: [ubuntu-24.04, ubuntu-24.04-arm]
-  #       clang-versions: ["14", "15", "16"]
-  #       containers:
-  #         - image: debian:bookworm-slim
-  #           desc: debian-12
-  #         - image: ubuntu:noble
-  #           desc: ubuntu-24.04
-  #       flags:
-  #         - flags: CHECKSUM_HACK=kfunc
-  #           args: ''
-  #           desc: kfunc
-  #         - flags: CHECKSUM_HACK=kfunc USE_LIBXDP=0
-  #           args: ''
-  #           desc: kfunc-no-libxdp
-  #         - flags: CHECKSUM_HACK=kfunc USE_LIBXDP=1
-  #           args: ''
-  #           desc: kfunc-libxdp-use-libbpf
-  #         - flags: CHECKSUM_HACK=kfunc USE_LIBXDP=1
-  #           args: --use-libxdp
-  #           desc: kfunc-libxdp-use-libxdp
-  #         - flags: CHECKSUM_HACK=kprobe STRIP_BTF_EXT=1
-  #           args: ''
-  #           desc: kprobe-strip-btf-ext
-  #   runs-on: ${{ matrix.runs-on }}
-  #   container:
-  #     image: ${{ matrix.containers.image }}
-  #     volumes:
-  #       - /lib/modules:/lib/modules
-  #       - /usr/src:/usr/src
-  #       - /usr/sbin/bpftool:/usr/sbin/bpftool
-  #     options: --privileged
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v4
-  #     - name: Install dependencies
-  #       run: |
-  #         apt update
-  #         apt install -y --no-install-recommends build-essential python3 clang-${{ matrix.clang-versions }} llvm pahole \
-  #           bats bc conntrack ethtool iperf3 jq socat tshark wireguard-tools \
-  #           libbpf-dev libffi-dev libelf-dev libxdp-dev lsb-release gcc-13
-  #     - name: Build
-  #       run: |
-  #         export BPF_CC=clang-${{ matrix.clang-versions }}
-  #         cp /sys/kernel/btf/vmlinux /lib/modules/`uname -r`/build
-  #         make -j ${{ matrix.flags.flags }}
-  #     - name: Upload built binaries
-  #       uses: actions/upload-artifact@v4
-  #       if: always()
-  #       with:
-  #         name: bin-${{ matrix.flags.desc }}-${{ matrix.containers.desc }}-clang-${{ matrix.clang-versions }}-${{ runner.arch }}
-  #         path: out
-  # test:
-  #   name: Run tests with ${{ matrix.flags.desc }} on ${{ matrix.containers.desc }} with Clang ${{ matrix.clang-versions }} on ${{ matrix.runs-on }}
-  #   runs-on: ${{ matrix.runs-on }}
-  #   needs: build
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       runs-on: [ubuntu-24.04, ubuntu-24.04-arm]
-  #       clang-versions: ["14", "15", "16"]
-  #       containers:
-  #         - image: debian:bookworm-slim
-  #           desc: debian-12
-  #         - image: ubuntu:noble
-  #           desc: ubuntu-24.04
-  #       flags:
-  #         - flags: CHECKSUM_HACK=kfunc
-  #           args: ''
-  #           desc: kfunc
-  #         - flags: CHECKSUM_HACK=kfunc USE_LIBXDP=0
-  #           args: ''
-  #           desc: kfunc-no-libxdp
-  #         - flags: CHECKSUM_HACK=kfunc USE_LIBXDP=1
-  #           args: ''
-  #           desc: kfunc-libxdp-use-libbpf
-  #         - flags: CHECKSUM_HACK=kfunc USE_LIBXDP=1
-  #           args: --use-libxdp
-  #           desc: kfunc-libxdp-use-libxdp
-  #         - flags: CHECKSUM_HACK=kprobe STRIP_BTF_EXT=1
-  #           args: ''
-  #           desc: kprobe-strip-btf-ext
-  #   steps:
-  #     - name: Download built binaries
-  #       uses: actions/upload-artifact@v4
-  #       if: always()
-  #       with:
-  #         name: bin-${{ matrix.flags.desc }}-${{ matrix.containers.desc }}-clang-${{ matrix.clang-versions }}-${{ runner.arch }}
-  #         path: out
-  #     - name: Install dependencies
-  #       run: |
-  #         sudo apt install python3 clang-${{ matrix.clang-versions }} llvm pahole \
-  #           bats bc conntrack ethtool iperf3 jq socat tshark wireguard-tools \
-  #           libbpf-dev libffi-dev libelf-dev libxdp-dev
-  #     - name: Test
-  #       run: |
-  #         sudo nft delete table filter  # Docker's nftables rule drops IPv4 packets in tests
-  #         sudo insmod out/mimic.ko
-  #         sudo env MIMIC_TEST_EXTRA_ARGS="${{ matrix.flags.args }}" make test ${{ matrix.flags.flags }}
-  #     - name: Upload captured packets
-  #       uses: actions/upload-artifact@v4
-  #       if: always()
-  #       with:
-  #         name: pcap-${{ matrix.flags.desc }}-${{ matrix.containers.desc }}-clang-${{ matrix.clang-versions }}-${{ runner.arch }}
-  #         path: out/*.pcapng
-  build:
-    name: Build for ${{ matrix.name }} with Clang ${{ matrix.distro.clang-version }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        distro:
-          # - {codename: bookworm, image: "debian:bookworm-slim", clang-version: "14"}
-          # - {codename: bookworm, image: "debian:bookworm-slim", clang-version: "15"}
-          - {codename: bookworm, image: "debian:bookworm-slim", clang-version: "16"}
-          # - {codename: trixie, image: "debian:trixie-slim", clang-version: "17"}
-          - {codename: trixie, image: "debian:trixie-slim", clang-version: "18"}
-          # - {codename: sid, image: "debian:sid-slim", clang-version: "17"}
-          - {codename: sid, image: "debian:sid-slim", clang-version: "18"}
-          # - {codename: noble, image: "ubuntu:noble", clang-version: "14"}
-          # - {codename: noble, image: "ubuntu:noble", clang-version: "15"}
-          - {codename: noble, image: "ubuntu:noble", clang-version: "16"}
-          # - {codename: noble, image: "ubuntu:noble", clang-version: "17"}
-          # - {codename: noble, image: "ubuntu:noble", clang-version: "18"}
-        include:
-          - {distro: {codename: bookworm}, name: "Debian 12", extra-repos: "deb http://deb.debian.org/debian bookworm-backports main"}
-          - {distro: {codename: trixie}, name: "Debian 13 (testing)"}
-          - {distro: {codename: sid}, name: "Debian sid"}
-          - {distro: {codename: noble}, name: "Ubuntu 24.04", extra-repos: "deb http://archive.ubuntu.com/ubuntu noble-backports main restricted universe multiverse"}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Run pre-building script
-        run: |
-          sed -i 's/clang/clang-${{ matrix.distro.clang-version }}/' debian/control
-          sed -i 's/BPF_CC=clang/BPF_CC=clang-${{ matrix.distro.clang-version }}/' debian/rules
-      - name: Build
-        uses: jtdor/build-deb-action@v1
-        with:
-          buildpackage-opts: -b -us -uc
-          docker-image: ${{ matrix.distro.image }}
-          extra-repos: ${{ matrix.extra-repos }}
-      - name: Upload
-        uses: actions/upload-artifact@v4
-        with:
-          name: packages-${{ matrix.distro.codename }}-clang-${{ matrix.distro.clang-version }}
-          path: |
-            debian/artifacts/*.deb
-            debian/artifacts/*.ddeb
-      - name: Test
-        run: |
-          sudo docker run -d --name test --workdir /root -v `pwd`:/root -v /lib/modules:/lib/modules -v /usr/src:/usr/src -v /boot:/boot ${{ matrix.distro.image }} tail -f /dev/null
-          sudo docker exec -i test bash -c 'apt update && apt install -y ./debian/artifacts/{mimic_,mimic-dkms_}*.deb'
-          sudo nft delete table filter
-          sudo modprobe mimic
-          sudo docker exec -i test base -c 'make test'
-      - name: Upload captured packets
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: pcap-${{ matrix.distro.codename }}-clang-${{ matrix.distro.clang-version }}
-          path: out/*.pcapng
-  test-deb-install:
-    name: Test .deb installation
-    needs: build
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: packages-noble-clang-16
-          path: packages-noble
-      - name: Test Install
-        run: |
-          sudo apt install ./packages-noble/*.deb linux-headers-`uname -r`
-          sudo modprobe mimic
-      - name: Upload log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: dkms-make-log
-          path: /var/lib/dkms/mimic/0.6.4/build/make.log
+  test:
+  name: Test ${{ matrix.flags.flags }} ${{ matrix.flags.args }} with Clang ${{ matrix.clang-versions }} on ${{ matrix.runs-on }}
+  runs-on: ${{ matrix.runs-on }}
+  strategy:
+    fail-fast: false
+    matrix:
+      flags:
+        - flags: CHECKSUM_HACK=kfunc
+          args: ''
+          desc: kfunc
+        - flags: CHECKSUM_HACK=kfunc USE_LIBXDP=0
+          args: ''
+          desc: kfunc-no-libxdp
+        - flags: CHECKSUM_HACK=kfunc USE_LIBXDP=1
+          args: ''
+          desc: kfunc-libxdp-use-libbpf
+        - flags: CHECKSUM_HACK=kfunc USE_LIBXDP=1
+          args: --use-libxdp
+          desc: kfunc-libxdp-use-libxdp
+        - flags: CHECKSUM_HACK=kprobe STRIP_BTF_EXT=1
+          args: ''
+          desc: kprobe-strip-btf-ext
+      clang-versions: ["14", "15", "16", "17", "18"]
+      runs-on: [ubuntu-24.04, ubuntu-24.04-arm]
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Install dependencies
+      run: |
+        sudo apt install python3 clang-${{ matrix.clang-versions }} llvm pahole \
+          bats bc conntrack ethtool iperf3 jq socat tshark wireguard-tools \
+          libbpf-dev libffi-dev libelf-dev libxdp-dev
+    - name: Build & Test
+      run: |
+        export BPF_CC=clang-${{ matrix.clang-versions }}
+        sudo cp /sys/kernel/btf/vmlinux /lib/modules/`uname -r`/build
+        make -j ${{ matrix.flags.flags }}
+        sudo nft delete table filter  # Docker's nftables rule drops IPv4 packets in tests
+        sudo insmod out/mimic.ko
+        sudo env MIMIC_TEST_EXTRA_ARGS="${{ matrix.flags.args }}" make test ${{ matrix.flags.flags }}
+    - name: Upload captured packets
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: pcap-${{ matrix.flags.desc }}-clang-${{ matrix.clang-versions }}-${{ runner.arch }}
+        path: out/*.pcapng
