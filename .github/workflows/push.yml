@@ -6,11 +6,13 @@ on:
 
 jobs:
   test:
-    name: Run tests with ${{ matrix.flags.flags }} ${{ matrix.flags.args }}
-    runs-on: ubuntu-24.04
+    name: Run tests with ${{ matrix.flags.flags }} ${{ matrix.flags.args }} on ${{ matrix.runs-on }} with Clang ${{ matrix.clang-versions }}
+    runs-on: ${{ matrix.runs-on }}
     strategy:
       fail-fast: false
       matrix:
+        runs-on: [ubuntu-24.04, ubuntu-24.04-arm]
+        clang-versions: ["14", "15", "16"]
         flags:
           - flags: CHECKSUM_HACK=kfunc
             args: ''
@@ -32,12 +34,12 @@ jobs:
         uses: actions/checkout@v4
       - name: Install dependencies
         run: |
-          sudo apt install python3 clang-15 llvm pahole \
+          sudo apt install python3 clang-${{ matrix.clang-versions }} llvm pahole \
             bats bc conntrack ethtool iperf3 jq socat tshark wireguard-tools \
             libbpf-dev libffi-dev libelf-dev libxdp-dev
       - name: Build & Test
         run: |
-          export BPF_CC=clang-15
+          export BPF_CC=clang-${{ matrix.clang-versions }}
           sudo cp /sys/kernel/btf/vmlinux /lib/modules/`uname -r`/build
           make -j ${{ matrix.flags.flags }}
           sudo nft delete table filter  # Docker's nftables rule drops IPv4 packets in tests
@@ -47,7 +49,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: pcap-${{ matrix.flags.desc }}
+          name: pcap-${{ matrix.flags.desc }}-clang-${{ matrix.clang-versions }}-${{ runner.arch }}
           path: out/*.pcapng
   build-deb:
     name: Build .deb packages for ${{ matrix.distro.name }}
