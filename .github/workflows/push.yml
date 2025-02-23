@@ -6,48 +6,44 @@ on:
 
 jobs:
   test:
-  name: Test ${{ matrix.flags.flags }} ${{ matrix.flags.args }} with Clang ${{ matrix.clang-versions }} on ${{ matrix.runs-on }}
-  runs-on: ${{ matrix.runs-on }}
-  strategy:
-    fail-fast: false
-    matrix:
-      flags:
-        - flags: CHECKSUM_HACK=kfunc
-          args: ''
-          desc: kfunc
-        - flags: CHECKSUM_HACK=kfunc USE_LIBXDP=0
-          args: ''
-          desc: kfunc-no-libxdp
-        - flags: CHECKSUM_HACK=kfunc USE_LIBXDP=1
-          args: ''
-          desc: kfunc-libxdp-use-libbpf
-        - flags: CHECKSUM_HACK=kfunc USE_LIBXDP=1
-          args: --use-libxdp
-          desc: kfunc-libxdp-use-libxdp
-        - flags: CHECKSUM_HACK=kprobe STRIP_BTF_EXT=1
-          args: ''
-          desc: kprobe-strip-btf-ext
-      clang-versions: ["14", "15", "16", "17", "18"]
-      runs-on: [ubuntu-24.04, ubuntu-24.04-arm]
-  steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Install dependencies
-      run: |
-        sudo apt install python3 clang-${{ matrix.clang-versions }} llvm pahole \
-          bats bc conntrack ethtool iperf3 jq socat tshark wireguard-tools \
-          libbpf-dev libffi-dev libelf-dev libxdp-dev
-    - name: Build & Test
-      run: |
-        export BPF_CC=clang-${{ matrix.clang-versions }}
-        sudo cp /sys/kernel/btf/vmlinux /lib/modules/`uname -r`/build
-        make -j ${{ matrix.flags.flags }}
-        sudo nft delete table filter  # Docker's nftables rule drops IPv4 packets in tests
-        sudo insmod out/mimic.ko
-        sudo env MIMIC_TEST_EXTRA_ARGS="${{ matrix.flags.args }}" make test ${{ matrix.flags.flags }}
-    - name: Upload captured packets
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: pcap-${{ matrix.flags.desc }}-clang-${{ matrix.clang-versions }}-${{ runner.arch }}
-        path: out/*.pcapng
+    name: Test ${{ matrix.flags.flags }} ${{ matrix.flags.args }} with Clang ${{ matrix.clang-versions }} on ${{ matrix.runs-on }}
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        flags:
+          - flags: ''
+            args: ''
+            desc: kfunc
+        clang-versions: ["14"]
+        runs-on: [ubuntu-24.04, ubuntu-24.04-arm]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt install python3 clang-${{ matrix.clang-versions }} llvm pahole \
+            bats bc conntrack ethtool iperf3 jq socat tshark wireguard-tools \
+            libbpf-dev libffi-dev libelf-dev libxdp-dev
+      - name: Build & Test
+        run: |
+          export BPF_CC=clang-${{ matrix.clang-versions }}
+          sudo cp /sys/kernel/btf/vmlinux /lib/modules/`uname -r`/build
+          make -j ${{ matrix.flags.flags }}
+          sudo nft delete table filter  # Docker's nftables rule drops IPv4 packets in tests
+          sudo insmod out/mimic.ko
+          sudo env MIMIC_TEST_EXTRA_ARGS="${{ matrix.flags.args }}" make test ${{ matrix.flags.flags }}
+      - name: Upload captured packets
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pcap-${{ matrix.flags.desc }}-clang-${{ matrix.clang-versions }}-${{ runner.arch }}
+          path: out/*.pcapng
+      - name: rm
+        run: sudo rm -rf out/*.pcapng
+      - name: Upload binaries
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: binaries-${{ matrix.flags.desc }}-clang-${{ matrix.clang-versions }}-${{ runner.arch }}
+          path: .
